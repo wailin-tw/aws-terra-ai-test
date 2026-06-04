@@ -54,4 +54,4 @@ Use IAM, Audit, Monitoring, Vault, and Virtual Cloud Network (VCN) as the main c
 
 ## Next step
 
-Continue to [**04-iac**](../04-iac.md) to see how changes should be delivered.
+Continue to [**04-iac**](04-iac.md) to see how changes should be delivered.
