@@ -41,4 +41,4 @@ For the recommended repository layout and environment strategy, see [../referenc
 
 ## Next step
 
-Continue to [**05-operations**](../05-operations.md) for day-2 operating practices.
+Continue to [**05-operations**](05-operations.md) for day-2 operating practices.
