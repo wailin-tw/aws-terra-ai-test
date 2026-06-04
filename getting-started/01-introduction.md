@@ -48,4 +48,4 @@ The goal is simple: keep the platform secure, observable, reproducible, and cost
 
 ## Next step
 
-Go to [**02-concepts**](../02-concepts.md) to learn the building blocks of the handbook.
+Go to [**02-concepts**](02-concepts.md) to learn the building blocks of the handbook.

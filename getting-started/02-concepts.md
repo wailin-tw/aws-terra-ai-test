@@ -50,4 +50,4 @@ Tag resources, enforce budgets, and review idle or oversized assets on a regular
 
 ## Next step
 
-Continue to [**03-cloud-basics**](../03-cloud-basics.md) for the platform baseline.
+Continue to [**03-cloud-basics**](03-cloud-basics.md) for the platform baseline.
