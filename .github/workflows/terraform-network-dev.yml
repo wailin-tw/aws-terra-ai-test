@@ -1,0 +1,105 @@
+name: Terraform Network Dev
+
+on:
+  pull_request:
+    paths:
+      - "infra/**"
+      - ".github/workflows/terraform-network-dev.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "infra/**"
+      - ".github/workflows/terraform-network-dev.yml"
+  workflow_dispatch:
+    inputs:
+      run_apply:
+        description: "Run terraform apply with reviewed plan artifact"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: ap-southeast-1
+  TF_WORKING_DIR: infra/stacks/network-dev
+  TF_VARS_FILE: ../../env/dev/network-dev.tfvars
+
+jobs:
+  plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME_DEV }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform fmt check
+        run: terraform -chdir=infra fmt -check -recursive
+
+      - name: Backend policy check
+        run: |
+          grep -R 'backend "s3"' infra/stacks/network-dev/*.tf
+          grep -R 'use_lockfile = true' infra/stacks/network-dev/*.tf
+
+      - name: Terraform init
+        run: terraform -chdir=${{ env.TF_WORKING_DIR }} init
+
+      - name: Terraform validate
+        run: terraform -chdir=${{ env.TF_WORKING_DIR }} validate
+
+      - name: Terraform plan
+        run: terraform -chdir=${{ env.TF_WORKING_DIR }} plan -var-file=${{ env.TF_VARS_FILE }} -out=tfplan
+
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: network-dev-tfplan
+          path: ${{ env.TF_WORKING_DIR }}/tfplan
+          if-no-files-found: error
+          retention-days: 14
+
+  apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    needs: plan
+    if: github.event_name == 'workflow_dispatch' && inputs.run_apply == 'true'
+    environment: dev
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME_DEV }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform init
+        run: terraform -chdir=${{ env.TF_WORKING_DIR }} init
+
+      - name: Download plan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: network-dev-tfplan
+          path: ${{ env.TF_WORKING_DIR }}
+
+      - name: Terraform apply reviewed plan
+        run: terraform -chdir=${{ env.TF_WORKING_DIR }} apply -auto-approve tfplan
