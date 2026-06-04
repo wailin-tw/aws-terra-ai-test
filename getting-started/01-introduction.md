@@ -20,8 +20,8 @@ The goal is simple: keep the platform secure, observable, reproducible, and cost
 | Step | What you'll learn |
 |---|---|
 | **01-introduction** (you are here) | What this handbook is, who it is for, and how the folders fit together |
-| [**02-concepts**](../02-concepts.md) | Core DevOps and cloud-platform ideas used in this handbook |
-| [**03-cloud-basics**](../03-cloud-basics.md) | Shared landing-zone, security, networking, and identity expectations |
+| [**02-concepts**](02-concepts.md) | Core DevOps and cloud-platform ideas used in this handbook |
+| [**03-cloud-basics**](03-cloud-basics.md) | Shared landing-zone, security, networking, and identity expectations |
 | [**04-iac**](../04-iac.md) | How we use infrastructure as code and delivery automation |
 | [**05-operations**](../05-operations.md) | Day-2 operations, observability, incident response, and cost control |
 
