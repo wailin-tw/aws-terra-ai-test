@@ -16,7 +16,7 @@ on:
       run_apply:
         description: "Run terraform apply with reviewed plan artifact"
         required: true
-        default: "ture"
+        default: "true"
         type: choice
         options:
           - "false"
@@ -49,12 +49,13 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Terraform fmt check
-        run: terraform -chdir=infra fmt -check -recursive
+        run: terraform -chdir=${{ env.TF_WORKING_DIR }} fmt -check -recursive
 
       - name: Backend policy check
         run: |
-          grep -R 'backend "s3"' infra/stacks/network-dev/*.tf
-          grep -R 'use_lockfile = true' infra/stacks/network-dev/*.tf
+          set -e
+          grep -R 'backend "s3"' ${{ env.TF_WORKING_DIR }}/*.tf || (echo "S3 backend not found in ${TF_WORKING_DIR}" && exit 1)
+          grep -R 'use_lockfile = true' ${{ env.TF_WORKING_DIR }}/*.tf || (echo "state locking not enabled in ${TF_WORKING_DIR}" && exit 1)
 
       - name: Terraform init
         run: terraform -chdir=${{ env.TF_WORKING_DIR }} init
@@ -63,7 +64,7 @@ jobs:
         run: terraform -chdir=${{ env.TF_WORKING_DIR }} validate
 
       - name: Terraform plan
-        run: terraform -chdir=${{ env.TF_WORKING_DIR }} plan -var-file=${{ env.TF_VARS_FILE }} -out=tfplan
+        run: terraform -chdir=${{ env.TF_WORKING_DIR }} plan -var-file=${{ env.TF_VARS_FILE }} -out=tfplan -input=false -no-color
 
       - name: Upload plan artifact
         uses: actions/upload-artifact@v4
@@ -102,4 +103,4 @@ jobs:
           path: ${{ env.TF_WORKING_DIR }}
 
       - name: Terraform apply reviewed plan
-        run: terraform -chdir=${{ env.TF_WORKING_DIR }} apply -auto-approve tfplan
+        run: terraform -chdir=${{ env.TF_WORKING_DIR }} apply -input=false -auto-approve tfplan
