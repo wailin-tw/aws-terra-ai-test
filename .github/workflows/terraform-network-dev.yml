@@ -49,59 +49,8 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME_DEV }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Require manual approval (PR comment '/apply' or file)
-        uses: actions/github-script@v6
-        with:
-          script: |
-            // Auto-approve for direct pushes to main
-            if (context.eventName === 'push' && context.ref === 'refs/heads/main') {
-              core.info('Push to main — skipping manual approval.');
-              return;
-            }
-
-            const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              commit_sha: context.sha
-            });
-
-            let approved = false;
-
-            if (prs && prs.length > 0) {
-              // Check associated PRs for an exact '/apply' comment
-              for (const pr of prs) {
-                const comments = await github.rest.issues.listComments({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: pr.number,
-                });
-                for (const c of comments.data) {
-                  if (typeof c.body === 'string' && c.body.trim() === '/apply') {
-                    approved = true;
-                    break;
-                  }
-                }
-                if (approved) break;
-              }
-              if (!approved) {
-                throw new Error('No /apply comment found on associated PR(s). Add a comment with exactly `/apply` to approve.');
-              }
-            } else {
-              // No PR associated with this commit; check for approval file on the branch
-              try {
-                const content = await github.rest.repos.getContent({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  path: '.github/terraform-apply-approve',
-                  ref: context.ref.replace('refs/heads/', '')
-                });
-                if (!content || !content.data) {
-                  throw new Error('Approval file not found');
-                }
-              } catch (err) {
-                throw new Error('No PR associated with this run and approval file .github/terraform-apply-approve not found on branch. Create that file on the branch or comment `/apply` on the PR.');
-              }
-            }
+      # Apply is gated by GitHub Environment approvals (set in repository settings)
+      # Remove PR-comment gate in favor of environment protection rules.
 
       - name: Terraform fmt check
         run: terraform -chdir=infra fmt -check -recursive
