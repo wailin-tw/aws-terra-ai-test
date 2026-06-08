@@ -31,8 +31,8 @@ jobs:
   call:
     uses: ./.github/workflows/terraform-base.yml
     with:
-      tf_working_dir: infra/stacks/network-dev
-      tf_vars_file: ../../env/dev/network-dev.tfvars
+      tf_working_dir: infra/stacks/network/dev
+      tf_vars_file: ../../../env/dev/network-dev.tfvars
       environment_name: dev
       auto_apply_main: false
       run_apply: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.run_apply == 'true' }}
