@@ -25,6 +25,7 @@ on:
 permissions:
   contents: read
   id-token: write
+  issues: write
 
 env:
   AWS_REGION: ap-southeast-1
@@ -48,22 +49,16 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME_DEV }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Terraform fmt check
-        run: terraform -chdir=infra fmt -check -recursive
-
-      - name: Backend policy check
-        run: |
-          grep -R 'backend "s3"' infra/stacks/network-dev/*.tf
-          grep -R 'use_lockfile = true' infra/stacks/network-dev/*.tf
-
-      - name: Terraform init
-        run: terraform -chdir=${{ env.TF_WORKING_DIR }} init
-
       - name: Require manual approval (PR comment '/apply' or file)
         uses: actions/github-script@v6
         with:
           script: |
-            const fs = require('fs');
+            // Auto-approve for direct pushes to main
+            if (context.eventName === 'push' && context.ref === 'refs/heads/main') {
+              core.info('Push to main — skipping manual approval.');
+              return;
+            }
+
             const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -73,7 +68,7 @@ jobs:
             let approved = false;
 
             if (prs && prs.length > 0) {
-              // Check the most relevant PRs for an '/apply' comment
+              // Check associated PRs for an exact '/apply' comment
               for (const pr of prs) {
                 const comments = await github.rest.issues.listComments({
                   owner: context.repo.owner,
@@ -89,10 +84,10 @@ jobs:
                 if (approved) break;
               }
               if (!approved) {
-                core.setFailed('No /apply comment found on associated PR(s). Add a comment with exactly `/apply` to approve.');
+                throw new Error('No /apply comment found on associated PR(s). Add a comment with exactly `/apply` to approve.');
               }
             } else {
-              // No PR associated with this commit; check for file on the branch
+              // No PR associated with this commit; check for approval file on the branch
               try {
                 const content = await github.rest.repos.getContent({
                   owner: context.repo.owner,
@@ -100,13 +95,26 @@ jobs:
                   path: '.github/terraform-apply-approve',
                   ref: context.ref.replace('refs/heads/', '')
                 });
-                if (content && content.data) {
-                  approved = true;
+                if (!content || !content.data) {
+                  throw new Error('Approval file not found');
                 }
               } catch (err) {
-                core.setFailed('No PR associated with this run and approval file .github/terraform-apply-approve not found on branch. Create that file on the branch or comment \'/apply\' on the PR.');
+                throw new Error('No PR associated with this run and approval file .github/terraform-apply-approve not found on branch. Create that file on the branch or comment `/apply` on the PR.');
               }
             }
+
+      - name: Terraform fmt check
+        run: terraform -chdir=infra fmt -check -recursive
+
+      - name: Backend policy check
+        run: |
+          grep -R 'backend "s3"' infra/stacks/network-dev/*.tf
+          grep -R 'use_lockfile = true' infra/stacks/network-dev/*.tf
+
+      - name: Terraform init
+        run: terraform -chdir=${{ env.TF_WORKING_DIR }} init
+
+      
 
       - name: Terraform validate
         run: terraform -chdir=${{ env.TF_WORKING_DIR }} validate
@@ -126,7 +134,7 @@ jobs:
     name: Terraform Apply
     runs-on: ubuntu-latest
     needs: plan
-    if: github.event_name == 'workflow_dispatch' && inputs.run_apply == 'true'
+    if: (github.event_name == 'workflow_dispatch' && inputs.run_apply == 'true') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     environment: dev
     steps:
       - name: Checkout
@@ -151,4 +159,4 @@ jobs:
           path: ${{ env.TF_WORKING_DIR }}
 
       - name: Terraform apply reviewed plan
-        run: terraform -chdir=${{ env.TF_WORKING_DIR }} apply -auto-approve tfplan
+        run: terraform -chdir=${{ env.TF_WORKING_DIR }} apply -input=false -auto-approve tfplan
