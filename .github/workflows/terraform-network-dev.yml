@@ -16,7 +16,7 @@ on:
       run_apply:
         description: "Run terraform apply with reviewed plan artifact"
         required: true
-        default: "ture"
+        default: "true"
         type: choice
         options:
           - "false"
