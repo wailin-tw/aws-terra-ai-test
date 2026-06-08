@@ -1,5 +1,5 @@
 output "vpc_id" {
-  description = "VPC ID for dev environment"
+  description = "VPC ID for prod environment"
   value       = module.vpc.vpc_id
 }
 

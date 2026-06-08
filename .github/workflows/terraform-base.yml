@@ -1,0 +1,110 @@
+name: Terraform Base (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      run_apply:
+        required: false
+        type: boolean
+        default: false
+      tf_working_dir:
+        required: true
+        type: string
+      tf_vars_file:
+        required: true
+        type: string
+      environment_name:
+        required: true
+        type: string
+      auto_apply_main:
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      AWS_ROLE_TO_ASSUME:
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+  issues: write
+
+env:
+  AWS_REGION: ap-southeast-1
+
+jobs:
+  plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity --output json
+
+      - name: Terraform fmt check
+        run: terraform -chdir=${{ inputs.tf_working_dir }} fmt -check -recursive
+
+      - name: Backend policy check
+        run: |
+          set -e
+          grep -R 'backend "s3"' ${{ inputs.tf_working_dir }}/*.tf || (echo "S3 backend not found in ${{ inputs.tf_working_dir }}" && exit 1)
+          grep -R 'use_lockfile = true' ${{ inputs.tf_working_dir }}/*.tf || (echo "state locking not enabled in ${{ inputs.tf_working_dir }}" && exit 1)
+
+      - name: Terraform init
+        run: terraform -chdir=${{ inputs.tf_working_dir }} init
+
+      - name: Terraform validate
+        run: terraform -chdir=${{ inputs.tf_working_dir }} validate
+
+      - name: Terraform plan
+        run: terraform -chdir=${{ inputs.tf_working_dir }} plan -var-file=${{ inputs.tf_vars_file }} -out=tfplan -input=false -no-color
+
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: network-${{ inputs.environment_name }}-tfplan
+          path: ${{ inputs.tf_working_dir }}/tfplan
+          if-no-files-found: error
+          retention-days: 14
+
+  apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    needs: plan
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.run_apply == true) || (github.event_name == 'push' && github.ref == 'refs/heads/main' && inputs.auto_apply_main == true) }}
+    environment: ${{ inputs.environment_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform init
+        run: terraform -chdir=${{ inputs.tf_working_dir }} init
+
+      - name: Download plan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: network-${{ inputs.environment_name }}-tfplan
+          path: ${{ inputs.tf_working_dir }}
+
+      - name: Terraform apply reviewed plan
+        run: terraform -chdir=${{ inputs.tf_working_dir }} apply -input=false -auto-approve tfplan

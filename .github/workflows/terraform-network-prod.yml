@@ -1,0 +1,40 @@
+name: Terraform Network Prod
+
+on:
+  pull_request:
+    paths:
+      - "infra/**"
+      - ".github/workflows/terraform-network-prod.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "infra/**"
+      - ".github/workflows/terraform-network-prod.yml"
+  workflow_dispatch:
+    inputs:
+      run_apply:
+        description: "Run terraform apply with reviewed plan artifact"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+permissions:
+  contents: read
+  id-token: write
+  issues: write
+
+jobs:
+  call:
+    uses: ./.github/workflows/terraform-base.yml
+    with:
+      tf_working_dir: infra/stacks/network/prod
+      tf_vars_file: ../../../env/prod/network-prod.tfvars
+      environment_name: prod
+      auto_apply_main: true
+      run_apply: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.run_apply == 'true' }}
+    secrets:
+      AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME_PROD }}
