@@ -48,6 +48,39 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME_DEV }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Verify AWS identity
+        run: |
+          echo "Verifying assumed role..."
+          aws sts get-caller-identity --output json > caller.json || true
+          cat caller.json
+
+      - name: Post AWS identity to PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('caller.json', 'utf8');
+            const prNumber = context.payload.pull_request.number;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: 'AWS identity (assumed role):\n```json\n' + body + '\n```'
+            });
+
+      - name: Debug runner info
+        run: |
+          echo "Runner debug (non-secret vars):"
+          echo "GITHUB_REPOSITORY=${GITHUB_REPOSITORY}"
+          echo "GITHUB_REF=${GITHUB_REF}"
+          echo "GITHUB_SHA=${GITHUB_SHA}"
+          echo "AWS_REGION=${AWS_REGION}"
+          echo "TF_WORKING_DIR=${TF_WORKING_DIR}"
+          echo "TF_VARS_FILE=${TF_VARS_FILE}"
+          aws --version || true
+          terraform -version || true
+
       - name: Terraform fmt check
         run: terraform -chdir=${{ env.TF_WORKING_DIR }} fmt -check -recursive
 
@@ -92,6 +125,23 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME_DEV }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS identity
+        run: |
+          echo "Verifying assumed role..."
+          aws sts get-caller-identity --output json
+
+      - name: Debug runner info
+        run: |
+          echo "Runner debug (non-secret vars):"
+          echo "GITHUB_REPOSITORY=${GITHUB_REPOSITORY}"
+          echo "GITHUB_REF=${GITHUB_REF}"
+          echo "GITHUB_SHA=${GITHUB_SHA}"
+          echo "AWS_REGION=${AWS_REGION}"
+          echo "TF_WORKING_DIR=${TF_WORKING_DIR}"
+          echo "TF_VARS_FILE=${TF_VARS_FILE}"
+          aws --version || true
+          terraform -version || true
 
       - name: Terraform init
         run: terraform -chdir=${{ env.TF_WORKING_DIR }} init
