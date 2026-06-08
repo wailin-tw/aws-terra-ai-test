@@ -1,16 +1,16 @@
-name: Terraform Network Dev
+name: Terraform Network Prod
 
 on:
   pull_request:
     paths:
       - "infra/**"
-      - ".github/workflows/terraform-network-dev.yml"
+      - ".github/workflows/terraform-network-prod.yml"
   push:
     branches:
       - main
     paths:
       - "infra/**"
-      - ".github/workflows/terraform-network-dev.yml"
+      - ".github/workflows/terraform-network-prod.yml"
   workflow_dispatch:
     inputs:
       run_apply:
@@ -31,10 +31,10 @@ jobs:
   call:
     uses: ./.github/workflows/terraform-base.yml
     with:
-      tf_working_dir: infra/stacks/network-dev
-      tf_vars_file: ../../env/dev/network-dev.tfvars
-      environment_name: dev
-      auto_apply_main: false
+      tf_working_dir: infra/stacks/network-prod
+      tf_vars_file: ../../env/prod/network-prod.tfvars
+      environment_name: prod
+      auto_apply_main: true
       run_apply: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.run_apply == 'true' }}
     secrets:
-      AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME_DEV }}
+      AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME_PROD }}
