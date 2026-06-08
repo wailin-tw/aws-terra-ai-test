@@ -7,7 +7,7 @@ locals {
       application         = var.application
       data-classification = var.data_classification
       managed-by          = "terraform"
-      stack               = "network-dev"
+      stack               = "network"
     },
     var.additional_tags
   )
