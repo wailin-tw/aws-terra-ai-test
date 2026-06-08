@@ -14,7 +14,7 @@ locals {
 }
 
 module "vpc" {
-  source = "../../modules/network/aws-vpc"
+  source = "../../../modules/network/aws-vpc"
 
   name_prefix          = var.project_name
   environment          = var.environment
