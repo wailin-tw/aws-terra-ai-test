@@ -59,6 +59,55 @@ jobs:
       - name: Terraform init
         run: terraform -chdir=${{ env.TF_WORKING_DIR }} init
 
+      - name: Require manual approval (PR comment '/apply' or file)
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha
+            });
+
+            let approved = false;
+
+            if (prs && prs.length > 0) {
+              // Check the most relevant PRs for an '/apply' comment
+              for (const pr of prs) {
+                const comments = await github.rest.issues.listComments({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                });
+                for (const c of comments.data) {
+                  if (typeof c.body === 'string' && c.body.trim() === '/apply') {
+                    approved = true;
+                    break;
+                  }
+                }
+                if (approved) break;
+              }
+              if (!approved) {
+                core.setFailed('No /apply comment found on associated PR(s). Add a comment with exactly `/apply` to approve.');
+              }
+            } else {
+              // No PR associated with this commit; check for file on the branch
+              try {
+                const content = await github.rest.repos.getContent({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  path: '.github/terraform-apply-approve',
+                  ref: context.ref.replace('refs/heads/', '')
+                });
+                if (content && content.data) {
+                  approved = true;
+                }
+              } catch (err) {
+                core.setFailed('No PR associated with this run and approval file .github/terraform-apply-approve not found on branch. Create that file on the branch or comment \'/apply\' on the PR.');
+              }
+            }
+
       - name: Terraform validate
         run: terraform -chdir=${{ env.TF_WORKING_DIR }} validate
 
